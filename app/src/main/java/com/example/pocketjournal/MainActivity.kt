@@ -7,39 +7,64 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
+import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.DropdownMenu
 import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.TextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -67,6 +92,7 @@ enum class EntryType {
     INT,
     FLOAT,
     STRING,
+    NONE,
 }
 
 @Entity (tableName = "entries")
@@ -217,21 +243,6 @@ fun Navigation(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun NavGraph(navController: NavHostController, modifier: Modifier) {
-    NavHost(
-        navController = navController,
-        startDestination = BottomNavScreen.Home.route,
-        modifier = modifier
-    ) {
-        composable(BottomNavScreen.Home.route) { Home(navController = navController) }
-        composable(BottomNavScreen.Month.route) { Month(navController = navController) }
-        composable(BottomNavScreen.Summary.route) { Summary(navController = navController) }
-        composable(BottomNavScreen.Settings.route) { Settings(navController = navController) }
-    }
-}
-
-
-@Composable
 fun BottomNavigationBar(navController: NavHostController) {
     val screens = listOf(
         BottomNavScreen.Home,
@@ -259,12 +270,13 @@ fun BottomNavigationBar(navController: NavHostController) {
                     Icon(
                         imageVector = screen.icon,
                         contentDescription = screen.label,
-                        modifier = Modifier.padding(14.dp).size(40.dp),
+                        modifier = Modifier
+                            .padding(14.dp)
+                            .size(40.dp),
                         tint = Color.White
                     )
                 }
-            }
-            else {
+            } else {
                 BottomNavigationItem(
                     selected = currentRoute == screen.route,
                     onClick = { navController.navigate(screen.route) },
@@ -284,6 +296,22 @@ fun BottomNavigationBar(navController: NavHostController) {
         }
     }
 }
+
+@Composable
+fun NavGraph(navController: NavHostController, modifier: Modifier) {
+    NavHost(
+        navController = navController,
+        startDestination = BottomNavScreen.Home.route,
+        modifier = modifier
+    ) {
+        composable(BottomNavScreen.Home.route) { Home(navController = navController) }
+        composable(BottomNavScreen.Month.route) { Month(navController = navController) }
+        composable(BottomNavScreen.New.route) { New(navController = navController) }
+        composable(BottomNavScreen.Summary.route) { Summary(navController = navController) }
+        composable(BottomNavScreen.Settings.route) { Settings(navController = navController) }
+    }
+}
+
 
 @Composable
 fun Home(modifier: Modifier = Modifier, navController: NavHostController) {
@@ -315,14 +343,96 @@ fun Month(navController: NavHostController) {
 
 @Composable
 fun New(navController: NavHostController) {
+    val viewModel: EntryViewModel = viewModel(
+        LocalViewModelStoreOwner.current!!,
+        "EntryViewModel",
+        EntryViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
+    val entryState by viewModel.entryState.collectAsStateWithLifecycle()
+
+    var expanded1 by remember { mutableStateOf(false) }
+    var expanded2 by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf("Select entry or create new") }
+
+    var type by remember { mutableStateOf(EntryType.NONE) }
+    var date by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var value by remember { mutableStateOf("") }
+
+
     Scaffold (
         modifier = Modifier,
         bottomBar = { BottomNavigationBar(navController) }
     ) { paddingValues ->
         Column(
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
         ) {
-            Text(text = "New")
+            Row (
+                modifier = Modifier.padding(16.dp)
+                    .fillMaxWidth()
+                    //.background(color = Color.LightGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
+                ,horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                TextField(
+                    value = selected,
+                    onValueChange = { selected = it },
+                    modifier = Modifier.fillMaxWidth(0.8f)
+                        .background(color = Color.Transparent),
+                )
+                DropdownMenu(
+                    expanded = expanded1,
+                    onDismissRequest = { expanded1 = false },
+                    //modifier = Modifier.background(color = Color.LightGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                ) { entryState.forEach { entry ->
+                        DropdownMenuItem(
+                            onClick = {
+                                selected = entry.name
+                                expanded1 = false
+                            },
+                            text = { Text(text = entry.name) }
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { expanded1 = !expanded1 },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Dropdown"
+                    )
+                }
+            }
+            if ( selected != "Select entry or create new") {
+                DropdownMenu(
+                    expanded = expanded2,
+                    onDismissRequest = { expanded2 = false },
+                    //modifier = Modifier.background(color = Color.LightGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                ) {
+                    entryState.forEach { entry ->
+                        DropdownMenuItem(
+                            onClick = {
+                                type = entry.type
+                                expanded2 = false
+                            },
+                            text = { Text(text = entry.type.toString()) }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Button(
+                onClick = { /*TODO*/ },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .height(40.dp),
+                colors = ButtonDefaults.buttonColors(Color.Black),
+                shape = RoundedCornerShape(100)
+            ) {
+                Text(text = "Save", color = Color.White)
+            }
         }
     }
 }
@@ -359,6 +469,6 @@ fun Settings(navController: NavHostController) {
 @Composable
 fun CutePreview() {
     PocketJournalTheme {
-        Navigation()
+        New(navController = rememberNavController())
     }
 }
