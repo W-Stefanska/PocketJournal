@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.grades"
+    namespace = "com.example.pocketjournal"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.grades"
+        applicationId = "com.example.pocketjournal"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

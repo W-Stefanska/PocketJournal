@@ -19,16 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.BottomNavigation
-import androidx.compose.material.BottomNavigationItem
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.FloatingActionButton
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.TextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -36,14 +27,18 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -56,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -116,14 +112,16 @@ interface EntryDao {
     suspend fun delete(entry: Entry)
 
     @Query("SELECT * FROM entries")
-    suspend fun getAllEntries(): Flow<List<Entry>>
+    fun getAllEntries(): Flow<List<Entry>>
 
     @Query("SELECT * FROM entries WHERE date = :date")
-    suspend fun getEntriesByDate(date: Long): Flow<List<Entry>>
+    fun getEntriesByDate(date: Long): Flow<List<Entry>>
 
     @Query("SELECT * FROM entries WHERE name = :name")
-    suspend fun getEntriesByName(name: String): Flow<List<Entry>>
+    fun getEntriesByName(name: String): Flow<List<Entry>>
 
+    @Query("SELECT COUNT(*) FROM entries WHERE name LIKE :word")
+    fun checkCatExists(word: String): Int
 }
 
 @Database(entities = [Entry::class], version = 1, exportSchema = false)
@@ -154,14 +152,17 @@ class EntryRepository(private val entryDao: EntryDao) {
     suspend fun delete(entry: Entry) {
         entryDao.delete(entry)
     }
-    suspend fun getEntries(): Flow<List<Entry>> {
+    fun getEntries(): Flow<List<Entry>> {
         return entryDao.getAllEntries()
     }
-    suspend fun getEntriesByDate(date: Long): Flow<List<Entry>> {
+    fun getEntriesByDate(date: Long): Flow<List<Entry>> {
         return entryDao.getEntriesByDate(date)
     }
-    suspend fun getEntriesByName(name: String): Flow<List<Entry>> {
+    fun getEntriesByName(name: String): Flow<List<Entry>> {
         return entryDao.getEntriesByName(name)
+    }
+    fun checkCatExists(word: String): Int {
+        return entryDao.checkCatExists(word)
     }
 }
 
@@ -211,6 +212,10 @@ class EntryViewModel(application: Application) : ViewModel() {
             repository.update(entry)
         }
     }
+
+    fun checkCatExists(word: String): Int {
+        return repository.checkCatExists(word)
+    }
 }
 
 sealed class BottomNavScreen(val route: String, val icon: ImageVector, val label: String) {
@@ -252,10 +257,10 @@ fun BottomNavigationBar(navController: NavHostController) {
         BottomNavScreen.Settings
     )
 
-    BottomNavigation (
+    BottomAppBar (
         modifier = Modifier
             .height(80.dp),
-        backgroundColor = Color.Gray
+        containerColor = Color.Gray
     ){
         val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
@@ -265,7 +270,7 @@ fun BottomNavigationBar(navController: NavHostController) {
                     onClick = { navController.navigate(screen.route) },
                     modifier = Modifier
                         .size(120.dp),
-                    backgroundColor = Color.Black
+                    containerColor = Color.Black
                 ) {
                     Icon(
                         imageVector = screen.icon,
@@ -277,7 +282,7 @@ fun BottomNavigationBar(navController: NavHostController) {
                     )
                 }
             } else {
-                BottomNavigationItem(
+                NavigationBarItem(
                     selected = currentRoute == screen.route,
                     onClick = { navController.navigate(screen.route) },
                     icon = {
@@ -355,11 +360,16 @@ fun New(navController: NavHostController) {
     var selected by remember { mutableStateOf("Select entry or create new") }
 
     var type by remember { mutableStateOf(EntryType.NONE) }
-    var date by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var value by remember { mutableStateOf("") }
 
+    val existingEntry = entryState.find { it.name == selected }
+    val isCategoryExisting = existingEntry != null
 
-    Scaffold (
+    if (isCategoryExisting) {
+        type = existingEntry!!.type
+    }
+
+    Scaffold(
         modifier = Modifier,
         bottomBar = { BottomNavigationBar(navController) }
     ) { paddingValues ->
@@ -368,11 +378,10 @@ fun New(navController: NavHostController) {
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            Row (
+            Row(
                 modifier = Modifier.padding(16.dp)
-                    .fillMaxWidth()
-                    //.background(color = Color.LightGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
-                ,horizontalArrangement = Arrangement.SpaceEvenly
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 TextField(
                     value = selected,
@@ -383,8 +392,8 @@ fun New(navController: NavHostController) {
                 DropdownMenu(
                     expanded = expanded1,
                     onDismissRequest = { expanded1 = false },
-                    //modifier = Modifier.background(color = Color.LightGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                ) { entryState.forEach { entry ->
+                ) {
+                    entryState.forEach { entry ->
                         DropdownMenuItem(
                             onClick = {
                                 selected = entry.name
@@ -404,26 +413,90 @@ fun New(navController: NavHostController) {
                     )
                 }
             }
-            if ( selected != "Select entry or create new") {
+
+
+            if (isCategoryExisting) {
+                TextField(
+                    value = type.toString(),
+                    onValueChange = { },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    readOnly = true,
+                    label = { Text("Typ kategorii (zablokowany)") }
+                )
+            }
+
+            else if (selected != "Select entry or create new") {
+                TextField(
+                    value = type.toString(),
+                    onValueChange = { },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    readOnly = true,
+                    label = { Text("Wybierz typ kategorii") }
+                )
                 DropdownMenu(
                     expanded = expanded2,
                     onDismissRequest = { expanded2 = false },
-                    //modifier = Modifier.background(color = Color.LightGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                 ) {
-                    entryState.forEach { entry ->
+                    EntryType.values().forEach { entryType ->
                         DropdownMenuItem(
                             onClick = {
-                                type = entry.type
+                                type = entryType
                                 expanded2 = false
                             },
-                            text = { Text(text = entry.type.toString()) }
+                            text = { Text(text = entryType.toString()) }
                         )
                     }
                 }
+                IconButton(
+                    onClick = { expanded2 = !expanded2 },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Dropdown"
+                    )
+                }
             }
+
+            when (type) {
+                EntryType.BOOLEAN -> {
+                    val isChecked = value.toBooleanStrictOrNull() ?: false
+                    Switch(
+                        checked = isChecked,
+                        onCheckedChange = { value = it.toString() },
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+                EntryType.INT, EntryType.FLOAT, EntryType.STRING -> {
+                    TextField(
+                        value = value,
+                        onValueChange = { value = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        label = { Text("Wprowadź wartość") },
+                        keyboardOptions = when (type) {
+                            EntryType.INT -> KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                            EntryType.FLOAT -> KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                            else -> KeyboardOptions.Default
+                        }
+                    )
+                }
+                EntryType.NONE -> {
+                    // Nie rób nic
+                }
+            }
+
             Spacer(modifier = Modifier.weight(1f))
             Button(
-                onClick = { /*TODO*/ },
+                onClick = {
+                    viewModel.addEntry(Entry(0, selected, type, value, System.currentTimeMillis()))
+                    navController.navigate(BottomNavScreen.Home.route)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
