@@ -10,12 +10,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
+import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
@@ -23,8 +28,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LiveData
@@ -182,6 +190,7 @@ class EntryViewModel(application: Application) : ViewModel() {
 sealed class BottomNavScreen(val route: String, val icon: ImageVector, val label: String) {
     data object Home : BottomNavScreen("home", Icons.Default.Home, "Home")
     data object Month : BottomNavScreen("month", Icons.Default.DateRange, "Month")
+    data object New: BottomNavScreen("new", Icons.Default.Create, "New")
     data object Summary : BottomNavScreen("summary", Icons.AutoMirrored.Filled.List, "Summary")
     data object Settings : BottomNavScreen("settings", Icons.Default.Settings, "Settings")
 }
@@ -227,23 +236,51 @@ fun BottomNavigationBar(navController: NavHostController) {
     val screens = listOf(
         BottomNavScreen.Home,
         BottomNavScreen.Month,
+        BottomNavScreen.New,
         BottomNavScreen.Summary,
         BottomNavScreen.Settings
     )
 
     BottomNavigation (
-        modifier = Modifier.height(80.dp)
+        modifier = Modifier
+            .height(80.dp),
+        backgroundColor = Color.Gray
     ){
         val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
         screens.forEach { screen ->
-            BottomNavigationItem(
-                selected = currentRoute == screen.route,
-                onClick = { navController.navigate(screen.route) },
-                icon = { Icon(imageVector = screen.icon, contentDescription = screen.label, modifier = Modifier.padding(14.dp).fillMaxSize()) },
-                //label = { Text(text = screen.label) },
-                modifier = Modifier.fillMaxSize()
-            )
+            if (screen.route == BottomNavScreen.New.route) {
+                FloatingActionButton(
+                    onClick = { navController.navigate(screen.route) },
+                    modifier = Modifier
+                        .size(120.dp),
+                    backgroundColor = Color.Black
+                ) {
+                    Icon(
+                        imageVector = screen.icon,
+                        contentDescription = screen.label,
+                        modifier = Modifier.padding(14.dp).size(40.dp),
+                        tint = Color.White
+                    )
+                }
+            }
+            else {
+                BottomNavigationItem(
+                    selected = currentRoute == screen.route,
+                    onClick = { navController.navigate(screen.route) },
+                    icon = {
+                        Icon(
+                            imageVector = screen.icon,
+                            contentDescription = screen.label,
+                            modifier = Modifier
+                                .padding(14.dp)
+                                .fillMaxSize()
+                        )
+                    },
+                    //label = { Text(text = screen.label) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }
@@ -272,6 +309,20 @@ fun Month(navController: NavHostController) {
             modifier = Modifier.padding(paddingValues)
         ) {
             Text(text = "Month")
+        }
+    }
+}
+
+@Composable
+fun New(navController: NavHostController) {
+    Scaffold (
+        modifier = Modifier,
+        bottomBar = { BottomNavigationBar(navController) }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            Text(text = "New")
         }
     }
 }
