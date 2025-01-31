@@ -68,5 +68,6 @@ dependencies {
     annotationProcessor(libs.androidx.room.compiler)
     //noinspection KaptUsageInsteadOfKsp
     kapt(libs.androidx.room.compiler)
+    implementation(libs.androidx.material.icons.extended)
 
 }
